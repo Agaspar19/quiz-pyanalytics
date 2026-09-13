@@ -322,6 +322,14 @@ function App(){
     if(d && d.ranking) setRanking(d.ranking);
   }
 
+  // cada resposta certa conta na hora para o ranking
+  function registarAcerto(){
+    const novo = acertosTotal + 1;
+    setAcertosTotal(novo);
+    try { localStorage.setItem("py_acertos", JSON.stringify(novo)); } catch(e){}
+    enviarPontos(progresso, novo);
+  }
+
   async function atualizarRanking(){
     if(!oficina) return;
     const d = await apiOficina({ acao:"ranking", cod: oficina.cod });
@@ -380,7 +388,7 @@ function App(){
                 ))}
               </ul>
               <div className="of-nota">
-                Atualiza sozinho a cada 20 segundos enquanto este painel está aberto. Estás como <b>{oficina.nome}</b>.
+                Atualiza a cada resposta certa e, com o painel aberto, também sozinho de 20 em 20 segundos. Estás como <b>{oficina.nome}</b>.
                 <button className="reset" style={{marginLeft:8}} onClick={sairOficina}>sair da oficina</button>
               </div>
             </>
@@ -398,12 +406,7 @@ function App(){
       {tela==="quiz" && (
         <Quiz nivel={NIVEIS[nivelAtual]} idx={nivelAtual}
           onSair={()=>setTela("trilha")}
-          onResultado={(ac)=>{
-            const t = acertosTotal + ac;
-            setAcertosTotal(t);
-            try { localStorage.setItem("py_acertos", JSON.stringify(t)); } catch(e){}
-            enviarPontos(progresso, t);
-          }}
+          onAcerto={registarAcerto}
           onVenceu={async()=>{
             const nv = Math.max(progresso, nivelAtual+1);
             if(nivelAtual+1 > progresso) await salvarProgresso(nv);
@@ -452,7 +455,7 @@ function TelaTrilha({niveis, progresso, onAbrir, onReset}){
   );
 }
 
-function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
+function Quiz({nivel, idx, onSair, onVenceu, onAcerto}){
   // se este nível ficou a meio, recomeça onde parou
   const guardado = (()=>{
     try {
@@ -471,13 +474,14 @@ function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
 
   const p = nivel.perguntas[i];
 
-  // ao chegar ao ecrã final, comunica os acertos desta ronda (para o ranking)
-  useEffect(()=>{ if(fim && onResultado) onResultado(acertos); }, [fim]);
 
   function responder(o){
     if(escolha!==null) return;
     setEscolha(o);
-    if(o===p.c) setAcertos(a=>a+1);
+    if(o===p.c){
+      setAcertos(a=>a+1);
+      if(onAcerto) onAcerto();   // soma no ranking da oficina imediatamente
+    }
   }
   function proxima(){
     if(i+1 < nivel.perguntas.length){
@@ -535,7 +539,7 @@ function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
         <button className="btn" onClick={proxima}>
           {i+1<nivel.perguntas.length ? "Próxima pergunta" : "Ver resultado"}
         </button>}
-      {escolha===null && <button className="btn ghost" onClick={onSair} style={{marginTop:14}}>Sair</button>}
+      {escolha===null && <button className="btn ghost" onClick={()=>{esquecerEmCurso(); onSair();}} style={{marginTop:14}}>Sair</button>}
     </div>
   );
 }
