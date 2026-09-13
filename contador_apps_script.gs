@@ -16,7 +16,7 @@
  * Para o resumo por dia, use uma fórmula (ver README no fim do ficheiro).
  */
 
-var VERSAO = 'v8';
+var VERSAO = 'v9';
 var ABA = 'acessos';
 var CABECALHO = ['data_hora', 'id_dispositivo'];
 
@@ -140,6 +140,30 @@ function zerarContador() {
   sh.clear();
   sh.appendRow(CABECALHO);
   Logger.log('Contador zerado.');
+}
+
+/**
+ * Cria (ou repõe) a aba de resumo por dia, com uma fórmula que se recalcula
+ * sozinha. Corre à mão, uma vez. Não precisa de reimplantar.
+ */
+function criarAbaPorDia() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('por_dia') || ss.getSheetByName('por dia');
+  if (!sh) sh = ss.insertSheet('por_dia');
+
+  sh.clear();
+  sh.getRange('A1').setFormula(
+    '=QUERY(' + ABA + '!A2:B, "select toDate(A), count(B) ' +
+    'where A is not null group by toDate(A) ' +
+    'label toDate(A) \'dia\', count(B) \'acessos_unicos\'", 0)'
+  );
+
+  sh.getRange('A1:B1').setFontWeight('bold');
+  sh.setColumnWidth(1, 130);
+  sh.setColumnWidth(2, 130);
+  sh.setFrozenRows(1);
+
+  Logger.log('Aba "' + sh.getName() + '" pronta. A fórmula atualiza-se sozinha.');
 }
 
 /* ---------------------------------------------------------------------------
