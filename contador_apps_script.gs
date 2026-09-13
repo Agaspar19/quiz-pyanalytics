@@ -1,5 +1,5 @@
 /**
- * Contador anônimo — PyAnalytics · Quiz "Trilha do Dado" (v7)
+ * Contador anônimo — PyAnalytics · Quiz "Trilha do Dado" (v10)
  *
  * Conta VISITANTES ÚNICOS POR DIA, não aberturas.
  * - O quiz envia um id anônimo de dispositivo (aleatório, sem nome nem e-mail)
@@ -13,14 +13,25 @@
  *
  * A aba "acessos" tem SÓ duas colunas: data_hora | id_dispositivo.
  * O dia é calculado a partir da data_hora — nada de guardar a mesma coisa duas vezes.
- * Para o resumo por dia, use uma fórmula (ver README no fim do ficheiro).
+ * O resumo por dia é uma fórmula, criada pela função criarAbaPorDia().
+ *
+ * A aba "oficina" guarda o ranking ao vivo: uma linha por participante
+ * (código da oficina + dispositivo), com apelido, níveis e acertos.
  */
 
-var VERSAO = 'v9';
+var VERSAO = 'v10';
 var ABA = 'acessos';
 var CABECALHO = ['data_hora', 'id_dispositivo'];
 
+// --- ranking ao vivo da oficina ---
+var ABA_OFICINA = 'oficina';
+var CAB_OFICINA = ['data_hora', 'codigo', 'apelido', 'id_dispositivo', 'niveis', 'acertos'];
+var TOPO = 6;
+
 function doGet(e) {
+  var acao = (e && e.parameter && e.parameter.acao) ? String(e.parameter.acao) : '';
+  if (acao === 'entrar' || acao === 'pontuar' || acao === 'ranking') return oficina(e, acao);
+
   var lock = LockService.getScriptLock();
   lock.waitLock(5000);
   try {
@@ -88,6 +99,82 @@ function diaTexto(d) {
   if (!(d instanceof Date)) d = new Date(d);
   var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
   return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+}
+
+// ===================== RANKING AO VIVO DA OFICINA =====================
+// Uma linha por participante (código + dispositivo). Três ações:
+//   acao=entrar   (cod, nome, id)              -> inscreve e devolve o ranking
+//   acao=pontuar  (cod, id, niveis, acertos)   -> atualiza a pontuação
+//   acao=ranking  (cod)                        -> só lê os 6 melhores
+
+function oficina(e, acao) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(ABA_OFICINA);
+    if (!sh) sh = ss.insertSheet(ABA_OFICINA);
+    if (sh.getLastRow() === 0) sh.appendRow(CAB_OFICINA);
+
+    var cod = String(e.parameter.cod || '').trim().toUpperCase().slice(0, 12);
+    var id  = String(e.parameter.id  || '').trim().slice(0, 40);
+    if (!cod) return json({ erro: 'codigo em falta' });
+
+    var dados = sh.getDataRange().getValues();
+
+    if (acao === 'ranking') return json({ codigo: cod, ranking: topo(dados, cod) });
+    if (!id) return json({ erro: 'id em falta' });
+
+    var linha = -1;
+    for (var i = 1; i < dados.length; i++) {
+      if (String(dados[i][1]).trim().toUpperCase() === cod && String(dados[i][3]).trim() === id) {
+        linha = i + 1;
+        break;
+      }
+    }
+
+    if (acao === 'entrar') {
+      var nome = String(e.parameter.nome || '').trim().slice(0, 24) || 'anónimo';
+      if (linha > 0) {
+        sh.getRange(linha, 3).setValue(nome);          // mudou de apelido
+      } else {
+        sh.appendRow([new Date(), cod, nome, id, 0, 0]);
+      }
+      return json({ ok: true, nome: nome, codigo: cod, ranking: topo(sh.getDataRange().getValues(), cod) });
+    }
+
+    // acao === 'pontuar' — a pontuação só sobe, nunca desce
+    if (linha < 0) return json({ erro: 'nao inscrito' });
+    var niveis  = Math.max(0, parseInt(e.parameter.niveis,  10) || 0);
+    var acertos = Math.max(0, parseInt(e.parameter.acertos, 10) || 0);
+    sh.getRange(linha, 5).setValue(Math.max(Number(sh.getRange(linha, 5).getValue()) || 0, niveis));
+    sh.getRange(linha, 6).setValue(Math.max(Number(sh.getRange(linha, 6).getValue()) || 0, acertos));
+
+    return json({ ok: true, ranking: topo(sh.getDataRange().getValues(), cod) });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Os TOPO melhores do código dado: mais níveis primeiro, empate decidido por acertos. */
+function topo(dados, cod) {
+  var lista = [];
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][1]).trim().toUpperCase() !== cod) continue;
+    lista.push({
+      nome: String(dados[i][2]),
+      niveis: Number(dados[i][4]) || 0,
+      acertos: Number(dados[i][5]) || 0
+    });
+  }
+  lista.sort(function (a, b) {
+    return (b.niveis - a.niveis) || (b.acertos - a.acertos) || a.nome.localeCompare(b.nome);
+  });
+  return lista.slice(0, TOPO);
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
 // ===================== MANUTENÇÃO (correr à mão no editor) =====================
@@ -167,11 +254,6 @@ function criarAbaPorDia() {
 }
 
 /* ---------------------------------------------------------------------------
- * RESUMO POR DIA — sem aba mantida por código.
- * Numa aba nova, cola isto na célula A1:
- *
- *   =QUERY(acessos!A2:B; "select toDate(A), count(B) where A is not null
- *    group by toDate(A) label toDate(A) 'dia', count(B) 'unicos'"; 0)
- *
- * Recalcula sozinha e nunca fica dessincronizada.
+ * RESUMO POR DIA — é uma fórmula, não uma aba mantida por código.
+ * Corre criarAbaPorDia() uma vez; a fórmula recalcula-se sozinha a partir daí.
  * ------------------------------------------------------------------------- */

@@ -102,20 +102,23 @@
   #app .result h2 { color:var(--azul-esc); margin-bottom:6px; }
   #app .stars { font-size:30px; letter-spacing:4px; margin:10px 0; }
 
-  /* placar */
-  #app .placar { margin-top:30px; border-top:1px dashed var(--linha); padding-top:20px; }
-  #app .placar h3 { font-size:15px; color:var(--cinza); margin-bottom:12px; }
-  #app .score-in { display:flex; gap:8px; }
-  #app .score-in input { flex:1; font-family:inherit; font-size:15px; padding:11px 13px; border:1.5px solid var(--linha); border-radius:10px; }
-  #app .lb { list-style:none; margin-top:14px; }
-  #app .lb li { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:10px; background:#fff; border:1px solid var(--linha); margin-bottom:7px; }
-  #app .lb .pos { font-weight:800; color:var(--azul); width:22px; }
-  #app .lb .nm { font-weight:700; }
-  #app .lb .pt { margin-left:auto; font-weight:800; color:var(--verde); }
-  #app .lb .empty { color:var(--cinza); font-size:14px; padding:6px 2px; }
 
+  /* oficina: botao + painel do ranking */
+  #app .of-bar { display:flex; justify-content:flex-end; margin:10px 0 0; }
+  #app .of-btn { font-family:inherit; font-size:14px; font-weight:700; padding:8px 16px; border-radius:999px; border:1.5px solid var(--azul); background:#fff; color:var(--azul); cursor:pointer; }
+  #app .of-btn.on { background:var(--azul); color:#fff; }
+  #app .of-painel { margin-top:12px; border:1.5px solid var(--linha); border-radius:12px; padding:14px; background:#fff; }
+  #app .of-painel h3 { font-size:15px; color:var(--cinza); margin-bottom:10px; }
+  #app .of-in { display:flex; gap:8px; flex-wrap:wrap; }
+  #app .of-in input { flex:1; min-width:130px; font-family:inherit; font-size:15px; padding:10px 12px; border:1.5px solid var(--linha); border-radius:10px; }
+  #app .rk { list-style:none; margin-top:12px; }
+  #app .rk li { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:10px; background:#f7f9fc; border:1px solid var(--linha); margin-bottom:7px; }
+  #app .rk li.eu { border-color:var(--azul); background:#eef4ff; }
+  #app .rk .pos { font-weight:800; color:var(--azul); width:22px; }
+  #app .rk .nm { font-weight:700; }
+  #app .rk .pt { margin-left:auto; font-weight:800; color:var(--verde); font-size:14px; }
+  #app .of-nota { color:var(--cinza); font-size:13px; margin-top:8px; line-height:1.5; }
   #app .foot { margin-top:26px; text-align:center; color:var(--cinza); font-size:12.5px; }
-  #app .foot .hits { font-weight:800; color:var(--azul); }
   #app a.reset { color:var(--cinza); font-size:12px; cursor:pointer; text-decoration:underline; background:none;border:none;font-family:inherit;}
 </style>
 </head>
@@ -207,23 +210,49 @@ const NIVEIS = [
     ]},
 ];
 
+// id anônimo do dispositivo: aleatório, guardado no navegador, não identifica a pessoa
+function idDispositivo(){
+  let d = null;
+  try { d = localStorage.getItem("py_devid"); } catch(e){}
+  if(!d){
+    d = "d" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { localStorage.setItem("py_devid", d); } catch(e){}
+  }
+  return d;
+}
+
+// chamada ao Apps Script (contador + ranking da oficina)
+async function apiOficina(params){
+  if(!CONTADOR_URL) return null;
+  const sep = CONTADOR_URL.indexOf("?") >= 0 ? "&" : "?";
+  const q = Object.keys(params).map(k => k + "=" + encodeURIComponent(params[k])).join("&");
+  try {
+    const r = await fetch(CONTADOR_URL + sep + q, { redirect: "follow" });
+    return await r.json();
+  } catch(e){ return null; }
+}
+
 function App(){
   const [progresso, setProgresso] = useState(0);   // nível mais alto desbloqueado (0-index)
   const [tela, setTela] = useState("trilha");        // trilha | quiz | fim
   const [nivelAtual, setNivelAtual] = useState(0);
   const [hits, setHits] = useState(null);
-  const [placar, setPlacar] = useState([]);
   const [carregou, setCarregou] = useState(false);
+  const [acertosTotal, setAcertosTotal] = useState(0);
+  const [oficina, setOficina] = useState(null);   // {cod, nome} enquanto inscrito
+  const [ranking, setRanking] = useState([]);
+  const [painel, setPainel] = useState(false);    // painel do ranking aberto?
+  const [ofNome, setOfNome] = useState("");
+  const [ofCod, setOfCod] = useState("");
 
-  // carregar progresso + placar (localStorage) + contar acesso (contador externo)
+  // carregar progresso (localStorage) + contar acesso (contador externo)
   useEffect(()=>{ (async()=>{
     try { const v = localStorage.getItem("py_progresso"); if(v) setProgresso(JSON.parse(v)); } catch(e){}
-    try { const v = localStorage.getItem("py_placar"); if(v) setPlacar(JSON.parse(v)); } catch(e){}
+    try { const v = localStorage.getItem("py_acertos"); if(v) setAcertosTotal(JSON.parse(v)); } catch(e){}
+    try { const v = localStorage.getItem("py_oficina"); if(v) setOficina(JSON.parse(v)); } catch(e){}
     try {
       if (CONTADOR_URL) {
-        // id anônimo do dispositivo (número aleatório, não identifica a pessoa)
-        let devId = localStorage.getItem("py_devid");
-        if (!devId) { devId = "d" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("py_devid", devId); }
+        const devId = idDispositivo();
         // contar no máximo 1x por dia por dispositivo
         const hoje = new Date().toISOString().slice(0,10); // AAAA-MM-DD
         const ultimo = localStorage.getItem("py_ultimo_dia");
@@ -255,6 +284,46 @@ function App(){
     try { localStorage.setItem("py_progresso", JSON.stringify(nv)); } catch(e){}
   }
 
+  // ---- oficina: entrar, sair, pontuar, atualizar ----
+  async function entrarOficina(){
+    const nome = ofNome.trim(), cod = ofCod.trim().toUpperCase();
+    if(!nome || !cod) return;
+    const d = await apiOficina({ acao:"entrar", cod, nome, id: idDispositivo() });
+    if(d && d.ok){
+      const of = { cod, nome };
+      setOficina(of);
+      try { localStorage.setItem("py_oficina", JSON.stringify(of)); } catch(e){}
+      setRanking(d.ranking || []);
+      enviarPontos(progresso, acertosTotal, of);
+    }
+  }
+
+  function sairOficina(){
+    setOficina(null); setRanking([]);
+    try { localStorage.removeItem("py_oficina"); } catch(e){}
+  }
+
+  async function enviarPontos(niveis, acertos, of){
+    const alvo = of || oficina;
+    if(!alvo) return;
+    const d = await apiOficina({ acao:"pontuar", cod: alvo.cod, id: idDispositivo(), niveis, acertos });
+    if(d && d.ranking) setRanking(d.ranking);
+  }
+
+  async function atualizarRanking(){
+    if(!oficina) return;
+    const d = await apiOficina({ acao:"ranking", cod: oficina.cod });
+    if(d && d.ranking) setRanking(d.ranking);
+  }
+
+  // enquanto o painel estiver aberto, atualiza sozinho de 20 em 20 segundos
+  useEffect(()=>{
+    if(!painel || !oficina) return;
+    atualizarRanking();
+    const t = setInterval(atualizarRanking, 20000);
+    return ()=>clearInterval(t);
+  }, [painel, oficina]);
+
   function abrir(i){ setNivelAtual(i); setTela("quiz"); }
 
   const pct = Math.round((progresso / NIVEIS.length) * 100);
@@ -266,16 +335,63 @@ function App(){
       <div className="sub">Seis níveis, um por módulo. Acerte todas as perguntas para desbloquear o próximo.</div>
       <div className="prog-line"><div className="prog-fill" style={{width: pct+"%"}}></div></div>
 
+      <div className="of-bar">
+        <button className={"of-btn" + (painel?" on":"")} onClick={()=>setPainel(!painel)}>
+          {oficina ? "Oficina · " + oficina.cod : "Oficina"}
+        </button>
+      </div>
+
+      {painel && (
+        <div className="of-painel">
+          {!oficina ? (
+            <>
+              <h3>Entrar na oficina</h3>
+              <div className="of-in">
+                <input placeholder="Apelido" value={ofNome} onChange={e=>setOfNome(e.target.value)} />
+                <input placeholder="Código" value={ofCod} onChange={e=>setOfCod(e.target.value)} style={{maxWidth:130}} />
+                <button className="btn" onClick={entrarOficina}>Entrar</button>
+              </div>
+              <div className="of-nota">O código é dito pelo monitor no início da oficina. O apelido aparece no ranking para toda a turma — não uses o nome completo.</div>
+            </>
+          ) : (
+            <>
+              <h3>Ranking da oficina {oficina.cod} — 6 melhores</h3>
+              <ul className="rk">
+                {ranking.length===0 && <div className="of-nota">Ainda sem pontuações. Conclui um nível para entrares no ranking.</div>}
+                {ranking.map((x,i)=>(
+                  <li key={i} className={x.nome===oficina.nome ? "eu" : ""}>
+                    <span className="pos">{i+1}</span>
+                    <span className="nm">{x.nome}</span>
+                    <span className="pt">{x.niveis} níveis · {x.acertos} acertos</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="of-nota">
+                Atualiza sozinho a cada 20 segundos enquanto este painel está aberto. Estás como <b>{oficina.nome}</b>.
+                <button className="reset" style={{marginLeft:8}} onClick={sairOficina}>sair da oficina</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {tela==="trilha" && (
         <TelaTrilha niveis={NIVEIS} progresso={progresso} onAbrir={abrir}
-          placar={placar} setPlacar={setPlacar} hits={hits} onReset={async()=>{
-            await salvarProgresso(0); }} />
+          onReset={async()=>{ await salvarProgresso(0); }} />
       )}
       {tela==="quiz" && (
         <Quiz nivel={NIVEIS[nivelAtual]} idx={nivelAtual}
           onSair={()=>setTela("trilha")}
+          onResultado={(ac)=>{
+            const t = acertosTotal + ac;
+            setAcertosTotal(t);
+            try { localStorage.setItem("py_acertos", JSON.stringify(t)); } catch(e){}
+            enviarPontos(progresso, t);
+          }}
           onVenceu={async()=>{
-            if(nivelAtual+1 > progresso) await salvarProgresso(nivelAtual+1);
+            const nv = Math.max(progresso, nivelAtual+1);
+            if(nivelAtual+1 > progresso) await salvarProgresso(nv);
+            enviarPontos(nv, acertosTotal);
             setTela("trilha");
           }} />
       )}
@@ -283,18 +399,7 @@ function App(){
   );
 }
 
-function TelaTrilha({niveis, progresso, onAbrir, placar, setPlacar, hits, onReset}){
-  const [nome, setNome] = useState("");
-  const [pts, setPts] = useState("");
-
-  async function addPlacar(){
-    const nm = nome.trim(); const p = parseInt(pts,10);
-    if(!nm || isNaN(p)) return;
-    const novo = [...placar, {nm, p}].sort((a,b)=>b.p-a.p).slice(0,8);
-    setPlacar(novo); setNome(""); setPts("");
-    try { localStorage.setItem("py_placar", JSON.stringify(novo)); } catch(e){}
-  }
-  async function limparPlacar(){ setPlacar([]); try{ localStorage.setItem("py_placar", JSON.stringify([]));}catch(e){} }
+function TelaTrilha({niveis, progresso, onAbrir, onReset}){
 
   return (
     <div>
@@ -324,38 +429,23 @@ function TelaTrilha({niveis, progresso, onAbrir, placar, setPlacar, hits, onRese
         </div>
       )}
 
-      {/* placar da oficina */}
-      <div className="placar">
-        <h3>Placar da oficina — anote quem foi mais longe</h3>
-        <div className="score-in">
-          <input placeholder="Nome ou apelido" value={nome} onChange={e=>setNome(e.target.value)} />
-          <input placeholder="Pontos" inputMode="numeric" style={{maxWidth:90}} value={pts} onChange={e=>setPts(e.target.value)} />
-          <button className="btn" onClick={addPlacar}>Anotar</button>
-        </div>
-        <ul className="lb">
-          {placar.length===0 && <div className="empty">Ainda sem pontuações. As melhores aparecem aqui durante a oficina.</div>}
-          {placar.map((x,i)=>(
-            <li key={i}><span className="pos">{i+1}</span><span className="nm">{x.nm}</span><span className="pt">{x.p} pt</span></li>
-          ))}
-        </ul>
-        {placar.length>0 && <button className="reset" onClick={limparPlacar}>limpar placar</button>}
-      </div>
-
       <div className="foot">
-        {hits!=null && <div>Contato com o material: <span className="hits">{hits}</span> acessos (contagem anônima)</div>}
         <div style={{marginTop:8}}><button className="reset" onClick={onReset}>reiniciar meu progresso</button></div>
       </div>
     </div>
   );
 }
 
-function Quiz({nivel, idx, onSair, onVenceu}){
+function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
   const [i, setI] = useState(0);
   const [escolha, setEscolha] = useState(null);
   const [acertos, setAcertos] = useState(0);
   const [fim, setFim] = useState(false);
 
   const p = nivel.perguntas[i];
+
+  // ao chegar ao ecrã final, comunica os acertos desta ronda (para o ranking)
+  useEffect(()=>{ if(fim && onResultado) onResultado(acertos); }, [fim]);
 
   function responder(o){
     if(escolha!==null) return;
