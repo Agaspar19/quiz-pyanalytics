@@ -124,8 +124,8 @@
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-// ▼▼▼ COLE AQUI O LINK DO SEU CONTADOR ANÔNIMO (ex.: CountAPI). Deixe "" para desligar. ▼▼▼
-const CONTADOR_URL = "";  // ex: "https://api.countapi.xyz/hit/pyanalytics-ararangua/quiz"
+// ▼▼▼ COLE AQUI O LINK DO SEU CONTADOR (o "app da Web" do Google Apps Script). Deixe "" para desligar. ▼▼▼
+const CONTADOR_URL = "";  // ex: "https://script.google.com/macros/s/AKfy.....dGh/exec"
 // ▲▲▲ enquanto vazio, o quiz funciona normalmente, só não mostra o número de acessos ▲▲▲
 
 // ---------- CONTEÚDO: 6 níveis (um por módulo) ----------
@@ -221,7 +221,7 @@ function App(){
     try { const v = localStorage.getItem("py_placar"); if(v) setPlacar(JSON.parse(v)); } catch(e){}
     try {
       if (CONTADOR_URL) {
-        const r = await fetch(CONTADOR_URL);
+        const r = await fetch(CONTADOR_URL, { redirect: "follow" });
         const d = await r.json();
         const n = (d && typeof d.value === "number") ? d.value : (typeof d === "number" ? d : null);
         if (n !== null) setHits(n);
