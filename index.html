@@ -127,9 +127,9 @@
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-// COLE AQUI O LINK DO SEU CONTADOR (o "app da Web" do Google Apps Script). Deixe "" para desligar.
-const CONTADOR_URL = "https://script.google.com/macros/s/AKfycbzFHir3mberFdqTq5oEar1xn_pMPB4hxyPdROXA2Swt4RQFeafYFuvR0u2PL7FwxbGn/exec"
-// enquanto vazio, o quiz funciona normalmente, só não mostra o número de acessos
+// ▼▼▼ COLE AQUI O LINK DO SEU CONTADOR (o "app da Web" do Google Apps Script). Deixe "" para desligar. ▼▼▼
+const CONTADOR_URL = "https://script.google.com/macros/s/AKfycbztebGAHmdzWgmZOQo4wEvNYb87RZjVGSsWgJJaxDni8B21HAWNfiXell4_Dv3nVGrB/exec"
+// ▲▲▲ enquanto vazio, o quiz funciona normalmente, só não mostra o número de acessos ▲▲▲
 
 // ---------- CONTEÚDO: 6 níveis (um por módulo) ----------
 const NIVEIS = [
@@ -251,6 +251,14 @@ function App(){
     try { const v = localStorage.getItem("py_progresso"); if(v) setProgresso(JSON.parse(v)); } catch(e){}
     try { const v = localStorage.getItem("py_acertos"); if(v) setAcertosTotal(JSON.parse(v)); } catch(e){}
     try { const v = localStorage.getItem("py_oficina"); if(v) setOficina(JSON.parse(v)); } catch(e){}
+    // retomar um nível que ficou a meio (fechou a página, ecrã bloqueou, ligação caiu)
+    try {
+      const v = JSON.parse(localStorage.getItem("py_emcurso") || "null");
+      if(v && typeof v.nv === "number" && v.nv >= 0 && v.nv < NIVEIS.length){
+        setNivelAtual(v.nv);
+        setTela("quiz");
+      }
+    } catch(e){}
     try {
       if (CONTADOR_URL) {
         const devId = idDispositivo();
@@ -382,7 +390,10 @@ function App(){
 
       {tela==="trilha" && (
         <TelaTrilha niveis={NIVEIS} progresso={progresso} onAbrir={abrir}
-          onReset={async()=>{ await salvarProgresso(0); }} />
+          onReset={async()=>{
+            try { localStorage.removeItem("py_emcurso"); } catch(e){}
+            await salvarProgresso(0);
+          }} />
       )}
       {tela==="quiz" && (
         <Quiz nivel={NIVEIS[nivelAtual]} idx={nivelAtual}
@@ -442,10 +453,21 @@ function TelaTrilha({niveis, progresso, onAbrir, onReset}){
 }
 
 function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
-  const [i, setI] = useState(0);
+  // se este nível ficou a meio, recomeça onde parou
+  const guardado = (()=>{
+    try {
+      const v = JSON.parse(localStorage.getItem("py_emcurso") || "null");
+      if(v && v.nv === idx && v.i > 0 && v.i < nivel.perguntas.length) return v;
+    } catch(e){}
+    return null;
+  })();
+
+  const [i, setI] = useState(guardado ? guardado.i : 0);
   const [escolha, setEscolha] = useState(null);
-  const [acertos, setAcertos] = useState(0);
+  const [acertos, setAcertos] = useState(guardado ? (guardado.acertos || 0) : 0);
   const [fim, setFim] = useState(false);
+
+  function esquecerEmCurso(){ try { localStorage.removeItem("py_emcurso"); } catch(e){} }
 
   const p = nivel.perguntas[i];
 
@@ -458,8 +480,14 @@ function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
     if(o===p.c) setAcertos(a=>a+1);
   }
   function proxima(){
-    if(i+1 < nivel.perguntas.length){ setI(i+1); setEscolha(null); }
-    else setFim(true);
+    if(i+1 < nivel.perguntas.length){
+      setI(i+1); setEscolha(null);
+      // guarda a posição JÁ com o resultado desta pergunta contado
+      try { localStorage.setItem("py_emcurso", JSON.stringify({ nv: idx, i: i+1, acertos })); } catch(e){}
+    } else {
+      esquecerEmCurso();
+      setFim(true);
+    }
   }
 
   if(fim){
@@ -476,10 +504,10 @@ function Quiz({nivel, idx, onSair, onVenceu, onResultado}){
         </p>
         <div className="row" style={{justifyContent:"center"}}>
           {passou
-            ? <button className="btn" onClick={onVenceu}>Voltar à trilha ✓</button>
+            ? <button className="btn" onClick={()=>{esquecerEmCurso(); onVenceu();}}>Voltar à trilha ✓</button>
             : <>
-                <button className="btn" onClick={()=>{setI(0);setEscolha(null);setAcertos(0);setFim(false);}}>Tentar de novo</button>
-                <button className="btn ghost" onClick={onSair}>Voltar</button>
+                <button className="btn" onClick={()=>{esquecerEmCurso();setI(0);setEscolha(null);setAcertos(0);setFim(false);}}>Tentar de novo</button>
+                <button className="btn ghost" onClick={()=>{esquecerEmCurso(); onSair();}}>Voltar</button>
               </>
           }
         </div>
