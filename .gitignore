@@ -1,6 +1,3 @@
-# Script do contador (fica no Google Apps Script, não no site)
-*.gs
-
 # Ficheiros de sistema
 .DS_Store
 Thumbs.db
