@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trilha do Dado — Quiz PyAnalytics</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  #app, #app * { box-sizing: border-box; margin: 0; padding: 0; }
+  #app {
+    --azul: #1f6feb;
+    --azul-esc: #0b3d91;
+    --amarelo: #f5c518;
+    --vermelho: #e63a2e;
+    --verde: #2ea043;
+    --tinta: #14202e;
+    --papel: #f7f9fc;
+    --cinza: #6b7789;
+    --linha: #dfe6ef;
+    font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+    color: var(--tinta);
+    background:
+      radial-gradient(circle at 12% 8%, rgba(245,197,24,.10), transparent 40%),
+      radial-gradient(circle at 88% 92%, rgba(31,111,235,.10), transparent 42%),
+      var(--papel);
+    min-height: 100%;
+    padding: 28px 18px 60px;
+    line-height: 1.5;
+  }
+  #app .wrap { max-width: 640px; margin: 0 auto; }
+
+  /* header */
+  #app .brand { display:flex; align-items:center; gap:12px; margin-bottom: 6px; }
+  #app .logo {
+    width: 40px; height: 40px; border-radius: 50%; flex:none;
+    box-shadow: 0 2px 8px rgba(11,61,145,.20);
+    border: 2px solid #fff;
+  }
+  #app .brand b { font-size: 13px; letter-spacing:.5px; color: var(--cinza); font-weight:700; }
+  #app h1 { font-size: 30px; line-height:1.1; margin: 10px 0 4px; color: var(--azul-esc); }
+  #app .sub { color: var(--cinza); font-size: 15px; margin-bottom: 22px; }
+
+  #app .prog-line { height: 8px; background: var(--linha); border-radius: 99px; overflow:hidden; margin-bottom: 26px; }
+  #app .prog-fill { height:100%; background: linear-gradient(90deg, var(--amarelo), var(--azul)); width:0; transition: width .5s ease; }
+
+  /* trilha de níveis */
+  #app .trilha { display:flex; flex-direction:column; gap:14px; }
+  #app .nivel {
+    display:flex; align-items:center; gap:16px;
+    background:#fff; border:1.5px solid var(--linha); border-radius:14px;
+    padding:16px 18px; text-align:left; width:100%; cursor:pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s;
+    font-family:inherit;
+  }
+  #app .nivel:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(11,61,145,.10); border-color: var(--azul); }
+  #app .nivel:disabled { cursor:not-allowed; opacity:.55; background:#f0f3f8; }
+  #app .badge {
+    width:46px; height:46px; border-radius:12px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:800; color:#fff;
+    background: var(--azul);
+  }
+  #app .nivel.feito .badge { background: var(--verde); }
+  #app .nivel.locked .badge { background: var(--cinza); }
+  #app .nivel .n-tit { font-size:16px; font-weight:700; }
+  #app .nivel .n-sub { font-size:13px; color: var(--cinza); }
+  #app .nivel .n-meta { margin-left:auto; font-size:12px; font-weight:700; color:var(--cinza); text-align:right; flex:none;}
+  #app .nivel.feito .n-meta { color: var(--verde); }
+
+  /* tela de quiz */
+  #app .card { background:#fff; border:1.5px solid var(--linha); border-radius:16px; padding:22px; }
+  #app .lvl-tag { display:inline-block; background:var(--amarelo); color:var(--tinta); font-weight:800; font-size:12px; padding:4px 10px; border-radius:99px; margin-bottom:12px; }
+  #app .qcount { color:var(--cinza); font-size:13px; font-weight:700; float:right; }
+  #app .qtext { font-size:19px; font-weight:700; margin:6px 0 18px; }
+  #app .opt {
+    display:block; width:100%; text-align:left; font-family:inherit; font-size:15.5px;
+    background:#fff; border:1.5px solid var(--linha); border-radius:11px;
+    padding:13px 15px; margin-bottom:10px; cursor:pointer; transition: all .12s;
+  }
+  #app .opt:hover:not(:disabled) { border-color:var(--azul); background:#f4f8ff; }
+  #app .opt:disabled { cursor:default; }
+  #app .opt.certa { border-color:var(--verde); background:#eaf7ee; font-weight:700; }
+  #app .opt.errada { border-color:var(--vermelho); background:#fdeceb; }
+  #app .fb { margin-top:6px; font-size:14.5px; padding:12px 14px; border-radius:10px; display:none; }
+  #app .fb.ok { display:block; background:#eaf7ee; color:#12611f; }
+  #app .fb.no { display:block; background:#fdeceb; color:#9e241b; }
+
+  #app .btn {
+    font-family:inherit; font-size:15px; font-weight:800; cursor:pointer;
+    background:var(--azul); color:#fff; border:none; border-radius:11px;
+    padding:13px 22px; margin-top:8px; transition: background .12s;
+  }
+  #app .btn:hover { background:var(--azul-esc); }
+  #app .btn.ghost { background:transparent; color:var(--azul); border:1.5px solid var(--linha); }
+  #app .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  /* resultado do nível */
+  #app .result { text-align:center; padding:8px 0; }
+  #app .result .big { font-size:46px; margin:6px 0; }
+  #app .result h2 { color:var(--azul-esc); margin-bottom:6px; }
+  #app .stars { font-size:30px; letter-spacing:4px; margin:10px 0; }
+
+  /* placar */
+  #app .placar { margin-top:30px; border-top:1px dashed var(--linha); padding-top:20px; }
+  #app .placar h3 { font-size:15px; color:var(--cinza); margin-bottom:12px; }
+  #app .score-in { display:flex; gap:8px; }
+  #app .score-in input { flex:1; font-family:inherit; font-size:15px; padding:11px 13px; border:1.5px solid var(--linha); border-radius:10px; }
+  #app .lb { list-style:none; margin-top:14px; }
+  #app .lb li { display:flex; align-items:center; gap:12px; padding:9px 12px; border-radius:10px; background:#fff; border:1px solid var(--linha); margin-bottom:7px; }
+  #app .lb .pos { font-weight:800; color:var(--azul); width:22px; }
+  #app .lb .nm { font-weight:700; }
+  #app .lb .pt { margin-left:auto; font-weight:800; color:var(--verde); }
+  #app .lb .empty { color:var(--cinza); font-size:14px; padding:6px 2px; }
+
+  #app .foot { margin-top:26px; text-align:center; color:var(--cinza); font-size:12.5px; }
+  #app .foot .hits { font-weight:800; color:var(--azul); }
+  #app a.reset { color:var(--cinza); font-size:12px; cursor:pointer; text-decoration:underline; background:none;border:none;font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ▼▼▼ COLE AQUI O LINK DO SEU CONTADOR ANÔNIMO (ex.: CountAPI). Deixe "" para desligar. ▼▼▼
+const CONTADOR_URL = "";  // ex: "https://api.countapi.xyz/hit/pyanalytics-ararangua/quiz"
+// ▲▲▲ enquanto vazio, o quiz funciona normalmente, só não mostra o número de acessos ▲▲▲
+
+// ---------- CONTEÚDO: 6 níveis (um por módulo) ----------
+const NIVEIS = [
+  { t:"Dados: conceitos, tipos e estrutura", s:"Nível 1 · Módulo I",
+    perguntas:[
+      {q:"O número 22, sozinho e sem qualquer contexto, é um exemplo de:", o:["Informação","Dado","Conhecimento","Sabedoria"], c:1, e:"Sozinho e sem contexto é apenas um dado; vira informação quando ganha significado."},
+      {q:"Sabendo que “dados não são apenas números”, qual é um exemplo de dado?", o:["Apenas valores numéricos","Uma foto, um áudio de mensagem e um comentário","Somente tabelas com linhas e colunas","Apenas medições do mundo físico"], c:1, e:"Dado pode ser foto, áudio, texto — não só números."},
+      {q:"A unidade observacional pode ser definida como:", o:["Cada característica observada de um elemento","O elemento sobre o qual os dados são coletados","O valor registrado em uma célula","O software usado para guardar os dados"], c:1, e:"É o elemento (ex.: cada aluno) sobre o qual se coletam dados."},
+      {q:"Numa tabela, as colunas representam ___ e as linhas representam ___:", o:["Casos / variáveis","Variáveis / casos","Dados / informações","Unidades / medidas"], c:1, e:"Colunas são variáveis; linhas são casos."},
+      {q:"A variável “estado civil” (solteiro, casado, divorciado) é:", o:["Quantitativa discreta","Quantitativa contínua","Qualitativa nominal","Qualitativa ordinal"], c:2, e:"Qualitativa nominal: categorias sem ordem."},
+      {q:"A variável “nível de satisfação” (baixo, médio, alto) é:", o:["Qualitativa ordinal","Qualitativa nominal","Quantitativa contínua","Quantitativa discreta"], c:0, e:"Qualitativa ordinal: categorias com uma ordem."},
+      {q:"“Número de filhos” e “altura” são, respectivamente:", o:["Contínua e discreta","Discreta e contínua","Nominal e ordinal","Ordinal e nominal"], c:1, e:"Filhos conta-se (discreta); altura mede-se (contínua)."},
+      {q:"O CEP, apesar de escrito com dígitos, é uma variável:", o:["Quantitativa contínua","Quantitativa discreta","Qualitativa (classificatória)","Do tipo data"], c:2, e:"Nem todo número é número: o CEP classifica, não mede."},
+      {q:"Uma coleção de fotos e vídeos, sem linhas e colunas, é um dado:", o:["Estruturado","Semiestruturado","Não estruturado","Tabular"], c:2, e:"Não estruturado: sem modelo fixo de linhas e colunas."},
+    ]},
+  { t:"Obtenção e Avaliação de Dados", s:"Nível 2 · Módulo II",
+    perguntas:[
+      {q:"Quais são as duas formas principais de obter dados?", o:["Copiar e colar","Gerar os próprios e buscar dados já existentes","Apagar e restaurar","Apenas comprar bases"], c:1, e:"Ou geramos nossos dados, ou buscamos fontes já existentes."},
+      {q:"Um questionário no Google Forms é um exemplo de:", o:["Busca de dados prontos","Geração de dados próprios","Avaliação de fonte","Visualização de dados"], c:1, e:"Criar um formulário gera dados novos."},
+      {q:"O que são “dados abertos”?", o:["Dados secretos de empresas","Dados públicos, disponíveis e livres para uso","Dados apagados","Dados pessoais protegidos por senha"], c:1, e:"Públicos e livres para qualquer pessoa usar."},
+      {q:"Qual é a fonte oficial de dados públicos no Brasil?", o:["dados.gov.br","Uma corrente de mensagens","Um print sem origem","Um blog anônimo"], c:0, e:"O Portal Brasileiro de Dados Abertos."},
+      {q:"O IBGE é responsável, entre outros, por:", o:["Vender músicas","O Censo e pesquisas como a PNAD","Consertar computadores","Desenvolver jogos"], c:1, e:"Instituto que realiza o Censo e grandes pesquisas."},
+      {q:"A Lei de Acesso à Informação (LAI) garante que:", o:["Ninguém pode ver dados públicos","Qualquer cidadão pode solicitar informações públicas","Só empresas acessam dados","Dados nunca são divulgados"], c:1, e:"Qualquer pessoa pode pedir informação pública, sem justificar."},
+      {q:"Ao avaliar a confiabilidade de uma fonte, NÃO é bom critério:", o:["Autoria","Propósito","Número de curtidas","Método de coleta"], c:2, e:"Curtidas não medem confiabilidade; autoria e método sim."},
+      {q:"“Dados são o novo petróleo” significa que:", o:["Dados são combustíveis","O valor está no uso que se faz dos dados","Dados poluem o ambiente","Dados são inúteis"], c:1, e:"O valor vem de transformar dados em decisões."},
+      {q:"Uma API de um serviço como o Spotify permite:", o:["Gerar energia","Acessar dados do serviço de forma programada","Imprimir documentos","Apagar contas"], c:1, e:"API dá acesso organizado aos dados do serviço."},
+      {q:"Diante de um gráfico sem fonte citada, o mais adequado é:", o:["Confiar totalmente","Compartilhar sem checar","Desconfiar e verificar a origem","Ignorar o assunto"], c:2, e:"Sem fonte, verifique a origem antes de confiar."},
+    ]},
+  { t:"Pré-processamento de Dados", s:"Nível 3 · Módulo III",
+    perguntas:[
+      {q:"Pré-processamento de dados é a etapa que:", o:["Analisa e gera gráficos finais","Prepara e limpa os dados antes da análise","Coleta dados por questionário","Protege os dados com senha"], c:1, e:"Prepara a base bruta antes de analisar."},
+      {q:"“Entra lixo, sai lixo” significa que:", o:["Todo dado deve ser descartado","Dados de entrada ruins geram resultados ruins","O computador limpa sozinho","Lixo eletrônico polui os dados"], c:1, e:"Se os dados entram errados, o resultado sai errado."},
+      {q:"Duas linhas idênticas para o mesmo registro são:", o:["Valor ausente","Outlier","Duplicado","Normalização"], c:2, e:"Registro repetido = duplicado."},
+      {q:"Uma célula de “Idade” vazia é exemplo de:", o:["Duplicado","Valor ausente","Inconsistência","Transformação"], c:1, e:"Falta o dado onde deveria haver um."},
+      {q:"“SC”, “sc” e “Santa Catarina” na mesma coluna pedem:", o:["Padronização","Remoção de duplicados","Normalização","Criação de variável"], c:0, e:"Unificar grafias diferentes numa só."},
+      {q:"Idade igual a 200 é, provavelmente:", o:["Dado arrumado","Outlier/erro a investigar","Valor ausente","Duplicado"], c:1, e:"Valor atípico que precisa ser verificado."},
+      {q:"Preencher vazios de uma coluna numérica com a média é:", o:["Tratar valores ausentes","Remover duplicados","Criar um outlier","Proteger dados"], c:0, e:"Uma das formas de tratar ausências."},
+      {q:"Antes de começar a limpar uma base, a boa prática é:", o:["Apagar o original","Guardar uma cópia do original","Publicar a base","Ignorar os erros"], c:1, e:"Trabalhar sobre uma cópia protege o original."},
+      {q:"Criar “faixa etária” a partir de “idade” é exemplo de:", o:["Limpeza","Transformação de dados","Remoção de duplicados","Coleta"], c:1, e:"Derivar uma nova coluna é transformar."},
+      {q:"Uma base “arrumada” (tidy) tem:", o:["Uma variável por coluna e um caso por linha","Várias informações por célula","Dados espalhados sem padrão","Apenas imagens"], c:0, e:"Uma variável por coluna, um caso por linha, um valor por célula."},
+    ]},
+  { t:"Análise e Visualização", s:"Nível 4 · Módulo IV",
+    perguntas:[
+      {q:"Analisar dados começa, antes de tudo, por:", o:["Escolher a cor do gráfico","Formular uma pergunta","Publicar um painel","Apagar a base"], c:1, e:"Toda análise parte de uma pergunta."},
+      {q:"A média de um conjunto de valores é:", o:["O maior valor","A soma dividida pela quantidade","O valor mais frequente","A diferença entre extremos"], c:1, e:"Soma dos valores dividida por quantos são."},
+      {q:"Para comparar o gasto entre secretarias, use:", o:["Linha","Dispersão","Barras/colunas","Pizza com 20 fatias"], c:2, e:"Barras comparam categorias."},
+      {q:"Para mostrar a evolução mês a mês, use:", o:["Gráfico de linha","Gráfico de pizza","Tabela de texto","Mapa conceitual"], c:0, e:"Linha mostra tendência no tempo."},
+      {q:"O gráfico de pizza funciona bem quando há:", o:["Muitas categorias","Poucas categorias (2 a 5)","Apenas datas","Só uma variável"], c:1, e:"Com muitas fatias fica ilegível."},
+      {q:"Começar o eixo das barras num valor diferente de zero:", o:["Torna mais honesto","Exagera diferenças e engana","Melhora as cores","Não tem efeito"], c:1, e:"O eixo de barras deve começar em zero."},
+      {q:"Um dashboard (painel) serve para:", o:["Limpar os dados","Reunir gráficos e indicadores numa tela","Coletar dados","Proteger os dados"], c:1, e:"Acompanha vários indicadores de relance."},
+      {q:"Um bom título de gráfico deve:", o:["Só conter a data","Resumir a conclusão do gráfico","Ser omitido","Repetir os números"], c:1, e:"O título já entrega a mensagem."},
+    ]},
+  { t:"Segurança, Privacidade e Direito Digital", s:"Nível 5 · Módulo V",
+    perguntas:[
+      {q:"Golpes que pedem transferência urgente, criando pressão, exploram:", o:["A calma da vítima","O senso de urgência","A leitura atenta","A autenticação em dois fatores"], c:1, e:"A pressa faz a vítima agir sem pensar."},
+      {q:"Uma senha forte se caracteriza por:", o:["Ser curta e fácil de lembrar","Usar a data de nascimento","Combinar letras, números e símbolos, sendo única","Ser a mesma em todos os sites"], c:2, e:"Longa, variada e única para cada conta."},
+      {q:"A autenticação em dois fatores (2FA) serve para:", o:["Deixar o celular mais rápido","Proteger a conta mesmo se a senha for descoberta","Aumentar o armazenamento","Apagar cookies"], c:1, e:"Uma segunda etapa além da senha."},
+      {q:"Um deepfake é:", o:["Um antivírus","Um áudio ou vídeo falso gerado por IA","Um tipo de backup","Uma senha forte"], c:1, e:"Mídia falsa criada por IA para enganar."},
+      {q:"Privacidade, no uso de dados, significa principalmente:", o:["Nunca usar a internet","Decidir quem pode acessar seus dados e para quê","Compartilhar tudo publicamente","Desligar o celular"], c:1, e:"Controle sobre quem acessa seus dados."},
+      {q:"A responsabilidade civil no ambiente digital indica que:", o:["Na internet não há consequências","Ofender ou expor alguém online pode gerar dever de indenizar","Tudo pode ser publicado","Só empresas têm deveres"], c:1, e:"Atos online têm consequências legais."},
+      {q:"NÃO é um princípio do uso ético de dados:", o:["Consentimento","Finalidade","Transparência","Coletar o máximo de dados possível"], c:3, e:"Coletar tudo contraria a minimização e a finalidade."},
+      {q:"A LGPD é a lei brasileira que:", o:["Libera o uso de qualquer dado","Protege os dados pessoais e garante direitos","Proíbe a internet","Regula apenas empresas estrangeiras"], c:1, e:"Lei Geral de Proteção de Dados Pessoais."},
+      {q:"Entre os direitos garantidos pela LGPD está:", o:["Impedir qualquer coleta no mundo","Solicitar acesso, correção e eliminação dos seus dados","Receber dinheiro por cada dado","Acessar dados de terceiros"], c:1, e:"Você controla os seus próprios dados."},
+      {q:"O órgão que fiscaliza o cumprimento da LGPD é a:", o:["ANPD","OMS","FIFA","ANS"], c:0, e:"Autoridade Nacional de Proteção de Dados."},
+    ]},
+  { t:"Modelagem e Previsão", s:"Nível 6 · Módulo VI",
+    perguntas:[
+      {q:"Um modelo de IA é:", o:["Uma foto da realidade","Uma regra que o computador aprende dos dados para prever","Um tipo de gráfico","Uma senha"], c:1, e:"Aprende padrões dos dados para prever."},
+      {q:"Classificação é prever:", o:["Um valor exato em reais","A que categoria um caso pertence","A cor de um gráfico","Uma senha forte"], c:1, e:"Estima o grupo/categoria de um caso."},
+      {q:"Treinar um modelo significa:", o:["Apagar dados","Mostrar exemplos para ele aprender o padrão","Proteger a planilha","Fazer um gráfico"], c:1, e:"Ele aprende com exemplos já resolvidos."},
+      {q:"Separamos dados de treino e de teste para:", o:["Deixar mais bonito","Verificar se o modelo aprendeu de verdade","Economizar espaço","Apagar duplicados"], c:1, e:"O teste usa dados que ele nunca viu."},
+      {q:"Uma árvore de decisão funciona como:", o:["Uma sequência de perguntas sim/não","Uma senha","Um cookie","Uma planilha vazia"], c:0, e:"Perguntas encadeadas até a previsão."},
+      {q:"A vantagem da árvore de decisão é que:", o:["Nunca erra","Dá para vê-la por dentro e ler suas regras","Não usa dados","É invisível"], c:1, e:"É interpretável: lê-se como um fluxograma."},
+      {q:"A precisão de um modelo é:", o:["A cor do gráfico","A porcentagem de acertos no teste","O número de linhas","O preço"], c:1, e:"Fração de acertos nos dados de teste."},
+      {q:"Se os dados de treino são enviesados, o modelo tende a:", o:["Corrigir sozinho","Repetir o viés nas previsões","Apagar os dados","Ficar mais justo"], c:1, e:"Reproduz a injustiça dos dados."},
+      {q:"Um Random Forest é:", o:["Uma única árvore","Um conjunto de muitas árvores que votam","Uma planilha","Um vírus"], c:1, e:"Floresta de árvores que votam numa previsão."},
+      {q:"Diante da previsão de uma IA, o certo é:", o:["Aceitar como verdade absoluta","Verificar, ciente da incerteza e do viés","Ignorar sempre","Esconder a fonte dos dados"], c:1, e:"Usar com senso crítico, ciente dos limites."},
+    ]},
+];
+
+function App(){
+  const [progresso, setProgresso] = useState(0);   // nível mais alto desbloqueado (0-index)
+  const [tela, setTela] = useState("trilha");        // trilha | quiz | fim
+  const [nivelAtual, setNivelAtual] = useState(0);
+  const [hits, setHits] = useState(null);
+  const [placar, setPlacar] = useState([]);
+  const [carregou, setCarregou] = useState(false);
+
+  // carregar progresso + placar (localStorage) + contar acesso (contador externo)
+  useEffect(()=>{ (async()=>{
+    try { const v = localStorage.getItem("py_progresso"); if(v) setProgresso(JSON.parse(v)); } catch(e){}
+    try { const v = localStorage.getItem("py_placar"); if(v) setPlacar(JSON.parse(v)); } catch(e){}
+    try {
+      if (CONTADOR_URL) {
+        const r = await fetch(CONTADOR_URL);
+        const d = await r.json();
+        const n = (d && typeof d.value === "number") ? d.value : (typeof d === "number" ? d : null);
+        if (n !== null) setHits(n);
+      }
+    } catch(e){}
+    setCarregou(true);
+  })(); }, []);
+
+  async function salvarProgresso(nv){
+    setProgresso(nv);
+    try { localStorage.setItem("py_progresso", JSON.stringify(nv)); } catch(e){}
+  }
+
+  function abrir(i){ setNivelAtual(i); setTela("quiz"); }
+
+  const pct = Math.round((progresso / NIVEIS.length) * 100);
+
+  return (
+    <div className="wrap">
+      <div className="brand"><img className="logo" src="data:image/png;base64,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" alt="PyAnalytics" /><b>PYANALYTICS · LETRAMENTO EM DADOS</b></div>
+      <h1>Trilha do Dado</h1>
+      <div className="sub">Seis níveis, um por módulo. Acerte todas as perguntas para desbloquear o próximo.</div>
+      <div className="prog-line"><div className="prog-fill" style={{width: pct+"%"}}></div></div>
+
+      {tela==="trilha" && (
+        <TelaTrilha niveis={NIVEIS} progresso={progresso} onAbrir={abrir}
+          placar={placar} setPlacar={setPlacar} hits={hits} onReset={async()=>{
+            await salvarProgresso(0); }} />
+      )}
+      {tela==="quiz" && (
+        <Quiz nivel={NIVEIS[nivelAtual]} idx={nivelAtual}
+          onSair={()=>setTela("trilha")}
+          onVenceu={async()=>{
+            if(nivelAtual+1 > progresso) await salvarProgresso(nivelAtual+1);
+            setTela("trilha");
+          }} />
+      )}
+    </div>
+  );
+}
+
+function TelaTrilha({niveis, progresso, onAbrir, placar, setPlacar, hits, onReset}){
+  const [nome, setNome] = useState("");
+  const [pts, setPts] = useState("");
+
+  async function addPlacar(){
+    const nm = nome.trim(); const p = parseInt(pts,10);
+    if(!nm || isNaN(p)) return;
+    const novo = [...placar, {nm, p}].sort((a,b)=>b.p-a.p).slice(0,8);
+    setPlacar(novo); setNome(""); setPts("");
+    try { localStorage.setItem("py_placar", JSON.stringify(novo)); } catch(e){}
+  }
+  async function limparPlacar(){ setPlacar([]); try{ localStorage.setItem("py_placar", JSON.stringify([]));}catch(e){} }
+
+  return (
+    <div>
+      <div className="trilha">
+        {niveis.map((nv,i)=>{
+          const feito = i < progresso;
+          const locked = i > progresso;
+          const cls = "nivel " + (feito?"feito ":"") + (locked?"locked":"");
+          return (
+            <button key={i} className={cls} disabled={locked} onClick={()=>onAbrir(i)}>
+              <div className="badge">{feito ? "✓" : (locked ? "🔒" : i+1)}</div>
+              <div>
+                <div className="n-tit">{nv.t}</div>
+                <div className="n-sub">{nv.s} · {nv.perguntas.length} perguntas</div>
+              </div>
+              <div className="n-meta">{feito ? "Concluído" : (locked ? "Bloqueado" : "Jogar")}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {progresso >= niveis.length && (
+        <div className="card" style={{marginTop:18, textAlign:"center", borderColor:"var(--verde)"}}>
+          <div style={{fontSize:38}}>🏆</div>
+          <h2 style={{color:"var(--verde)"}}>Trilha completa!</h2>
+          <p style={{color:"var(--cinza)"}}>Você passou pelos seis módulos. Mostre esta tela na oficina.</p>
+        </div>
+      )}
+
+      {/* placar da oficina */}
+      <div className="placar">
+        <h3>Placar da oficina — anote quem foi mais longe</h3>
+        <div className="score-in">
+          <input placeholder="Nome ou apelido" value={nome} onChange={e=>setNome(e.target.value)} />
+          <input placeholder="Pontos" inputMode="numeric" style={{maxWidth:90}} value={pts} onChange={e=>setPts(e.target.value)} />
+          <button className="btn" onClick={addPlacar}>Anotar</button>
+        </div>
+        <ul className="lb">
+          {placar.length===0 && <div className="empty">Ainda sem pontuações. As melhores aparecem aqui durante a oficina.</div>}
+          {placar.map((x,i)=>(
+            <li key={i}><span className="pos">{i+1}</span><span className="nm">{x.nm}</span><span className="pt">{x.p} pt</span></li>
+          ))}
+        </ul>
+        {placar.length>0 && <button className="reset" onClick={limparPlacar}>limpar placar</button>}
+      </div>
+
+      <div className="foot">
+        {hits!=null && <div>Contato com o material: <span className="hits">{hits}</span> acessos (contagem anônima)</div>}
+        <div style={{marginTop:8}}><button className="reset" onClick={onReset}>reiniciar meu progresso</button></div>
+      </div>
+    </div>
+  );
+}
+
+function Quiz({nivel, idx, onSair, onVenceu}){
+  const [i, setI] = useState(0);
+  const [escolha, setEscolha] = useState(null);
+  const [acertos, setAcertos] = useState(0);
+  const [fim, setFim] = useState(false);
+
+  const p = nivel.perguntas[i];
+
+  function responder(o){
+    if(escolha!==null) return;
+    setEscolha(o);
+    if(o===p.c) setAcertos(a=>a+1);
+  }
+  function proxima(){
+    if(i+1 < nivel.perguntas.length){ setI(i+1); setEscolha(null); }
+    else setFim(true);
+  }
+
+  if(fim){
+    const total = nivel.perguntas.length;
+    const passou = acertos===total;
+    return (
+      <div className="card result">
+        <div className="big">{passou ? "🎉" : "💪"}</div>
+        <h2>{passou ? "Nível concluído!" : "Quase lá!"}</h2>
+        <div className="stars">{"★".repeat(acertos)}{"☆".repeat(total-acertos)}</div>
+        <p style={{color:"var(--cinza)", marginBottom:14}}>
+          Você acertou <b>{acertos}</b> de <b>{total}</b>.
+          {passou ? " O próximo nível está desbloqueado." : " Acerte todas para desbloquear o próximo nível."}
+        </p>
+        <div className="row" style={{justifyContent:"center"}}>
+          {passou
+            ? <button className="btn" onClick={onVenceu}>Voltar à trilha ✓</button>
+            : <>
+                <button className="btn" onClick={()=>{setI(0);setEscolha(null);setAcertos(0);setFim(false);}}>Tentar de novo</button>
+                <button className="btn ghost" onClick={onSair}>Voltar</button>
+              </>
+          }
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <span className="lvl-tag">{nivel.s}</span>
+      <span className="qcount">Pergunta {i+1}/{nivel.perguntas.length}</span>
+      <div className="qtext">{p.q}</div>
+      {p.o.map((op,k)=>{
+        let cls="opt";
+        if(escolha!==null){
+          if(k===p.c) cls+=" certa";
+          else if(k===escolha) cls+=" errada";
+        }
+        return <button key={k} className={cls} disabled={escolha!==null} onClick={()=>responder(k)}>{op}</button>;
+      })}
+      <div className={"fb " + (escolha===null?"":(escolha===p.c?"ok":"no"))}>
+        {escolha!==null && (escolha===p.c ? "Certo! " : "Não é essa. ") + p.e}
+      </div>
+      {escolha!==null &&
+        <button className="btn" onClick={proxima}>
+          {i+1<nivel.perguntas.length ? "Próxima pergunta" : "Ver resultado"}
+        </button>}
+      {escolha===null && <button className="btn ghost" onClick={onSair} style={{marginTop:14}}>Sair</button>}
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("app"));
+</script>
+</body>
+</html>
