@@ -19,7 +19,7 @@
  * (código da oficina + dispositivo), com apelido, níveis e acertos.
  */
 
-var VERSAO = 'v10';
+var VERSAO = 'v11';
 var ABA = 'acessos';
 var CABECALHO = ['data_hora', 'id_dispositivo'];
 
@@ -27,6 +27,8 @@ var CABECALHO = ['data_hora', 'id_dispositivo'];
 var ABA_OFICINA = 'oficina';
 var CAB_OFICINA = ['data_hora', 'codigo', 'apelido', 'id_dispositivo', 'niveis', 'acertos'];
 var TOPO = 6;
+var ABA_CONFIG = 'config';           // onde o monitor define o código da oficina
+var CODIGO_INICIAL = 'OFICINA';
 
 function doGet(e) {
   var acao = (e && e.parameter && e.parameter.acao) ? String(e.parameter.acao) : '';
@@ -134,6 +136,8 @@ function oficina(e, acao) {
     }
 
     if (acao === 'entrar') {
+      // só entra quem souber o código que está na aba "config"
+      if (cod !== codigoAtivo(ss)) return json({ erro: 'codigo errado' });
       var nome = String(e.parameter.nome || '').trim().slice(0, 24) || 'anónimo';
       if (linha > 0) {
         sh.getRange(linha, 3).setValue(nome);          // mudou de apelido
@@ -154,6 +158,31 @@ function oficina(e, acao) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Lê o código da oficina na aba "config" (célula ao lado de "codigo_oficina").
+ * O monitor muda esse valor na planilha — não é preciso mexer no código nem reimplantar.
+ */
+function codigoAtivo(ss) {
+  var sh = ss.getSheetByName(ABA_CONFIG);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_CONFIG);
+    sh.appendRow(['chave', 'valor']);
+    sh.appendRow(['codigo_oficina', CODIGO_INICIAL]);
+    sh.getRange('A1:B1').setFontWeight('bold');
+    sh.setColumnWidth(1, 160);
+    return CODIGO_INICIAL;
+  }
+  var dados = sh.getDataRange().getValues();
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]).trim().toLowerCase() === 'codigo_oficina') {
+      var v = String(dados[i][1]).trim().toUpperCase();
+      return v || CODIGO_INICIAL;
+    }
+  }
+  sh.appendRow(['codigo_oficina', CODIGO_INICIAL]);
+  return CODIGO_INICIAL;
 }
 
 /** Os TOPO melhores do código dado: mais níveis primeiro, empate decidido por acertos. */
@@ -227,6 +256,29 @@ function zerarContador() {
   sh.clear();
   sh.appendRow(CABECALHO);
   Logger.log('Contador zerado.');
+}
+
+/**
+ * Define o código da oficina (o que os alunos escrevem para entrar).
+ * Edita a palavra aqui dentro e corre a função — ou muda direto na aba "config".
+ */
+function definirCodigoOficina() {
+  var NOVO = 'ARA13';   // <-- muda aqui
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(ABA_CONFIG);
+  if (!sh) { codigoAtivo(ss); sh = ss.getSheetByName(ABA_CONFIG); }
+
+  var dados = sh.getDataRange().getValues();
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]).trim().toLowerCase() === 'codigo_oficina') {
+      sh.getRange(i + 1, 2).setValue(NOVO.trim().toUpperCase());
+      Logger.log('Código da oficina agora: ' + NOVO.trim().toUpperCase());
+      return;
+    }
+  }
+  sh.appendRow(['codigo_oficina', NOVO.trim().toUpperCase()]);
+  Logger.log('Código da oficina agora: ' + NOVO.trim().toUpperCase());
 }
 
 /**

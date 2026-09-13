@@ -244,6 +244,7 @@ function App(){
   const [painel, setPainel] = useState(false);    // painel do ranking aberto?
   const [ofNome, setOfNome] = useState("");
   const [ofCod, setOfCod] = useState("");
+  const [ofErro, setOfErro] = useState("");
 
   // carregar progresso (localStorage) + contar acesso (contador externo)
   useEffect(()=>{ (async()=>{
@@ -288,7 +289,10 @@ function App(){
   async function entrarOficina(){
     const nome = ofNome.trim(), cod = ofCod.trim().toUpperCase();
     if(!nome || !cod) return;
+    setOfErro("");
     const d = await apiOficina({ acao:"entrar", cod, nome, id: idDispositivo() });
+    if(d && d.erro === "codigo errado"){ setOfErro("Código errado — confirma com o monitor."); return; }
+    if(!d || !d.ok){ setOfErro("Não deu para entrar. Verifica a ligação e tenta outra vez."); return; }
     if(d && d.ok){
       const of = { cod, nome };
       setOficina(of);
@@ -351,6 +355,7 @@ function App(){
                 <input placeholder="Código" value={ofCod} onChange={e=>setOfCod(e.target.value)} style={{maxWidth:130}} />
                 <button className="btn" onClick={entrarOficina}>Entrar</button>
               </div>
+              {ofErro && <div className="of-nota" style={{color:"#c0392b", fontWeight:700}}>{ofErro}</div>}
               <div className="of-nota">O código é dito pelo monitor no início da oficina. O apelido aparece no ranking para toda a turma — não uses o nome completo.</div>
             </>
           ) : (
