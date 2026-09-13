@@ -125,7 +125,7 @@
 const { useState, useEffect } = React;
 
 // ▼▼▼ COLE AQUI O LINK DO SEU CONTADOR (o "app da Web" do Google Apps Script). Deixe "" para desligar. ▼▼▼
-const CONTADOR_URL = "https://script.google.com/macros/s/AKfycbzr3SCvbHgTSJP6LlmV5hi-cCsGnbT9yuJ815fkuc96MnCMJJ4jOZ0x4f2H7AbKFPTS/exec";  // 
+const CONTADOR_URL = "https://script.google.com/macros/s/AKfycbzr3SCvbHgTSJP6LlmV5hi-cCsGnbT9yuJ815fkuc96MnCMJJ4jOZ0x4f2H7AbKFPTS/exec";
 // ▲▲▲ enquanto vazio, o quiz funciona normalmente, só não mostra o número de acessos ▲▲▲
 
 // ---------- CONTEÚDO: 6 níveis (um por módulo) ----------
@@ -221,10 +221,30 @@ function App(){
     try { const v = localStorage.getItem("py_placar"); if(v) setPlacar(JSON.parse(v)); } catch(e){}
     try {
       if (CONTADOR_URL) {
-        const r = await fetch(CONTADOR_URL, { redirect: "follow" });
-        const d = await r.json();
-        const n = (d && typeof d.value === "number") ? d.value : (typeof d === "number" ? d : null);
-        if (n !== null) setHits(n);
+        // id anônimo do dispositivo (número aleatório, não identifica a pessoa)
+        let devId = localStorage.getItem("py_devid");
+        if (!devId) { devId = "d" + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("py_devid", devId); }
+        // contar no máximo 1x por dia por dispositivo
+        const hoje = new Date().toISOString().slice(0,10); // AAAA-MM-DD
+        const ultimo = localStorage.getItem("py_ultimo_dia");
+        const sep = CONTADOR_URL.indexOf("?") >= 0 ? "&" : "?";
+        const url = CONTADOR_URL + sep + "id=" + encodeURIComponent(devId);
+        if (ultimo !== hoje) {
+          // primeiro acesso do dia neste dispositivo: conta
+          const r = await fetch(url, { redirect: "follow" });
+          const d = await r.json();
+          const n = (d && typeof d.value === "number") ? d.value : (typeof d === "number" ? d : null);
+          if (n !== null) setHits(n);
+          localStorage.setItem("py_ultimo_dia", hoje);
+        } else {
+          // já contado hoje: só lê o total sem somar (envia flag ping)
+          try {
+            const r = await fetch(url + "&ping=1", { redirect: "follow" });
+            const d = await r.json();
+            const n = (d && typeof d.value === "number") ? d.value : null;
+            if (n !== null) setHits(n);
+          } catch(e2){}
+        }
       }
     } catch(e){}
     setCarregou(true);
