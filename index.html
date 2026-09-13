@@ -119,7 +119,16 @@
   #app .rk .pt { margin-left:auto; font-weight:800; color:var(--verde); font-size:14px; }
   #app .of-nota { color:var(--cinza); font-size:13px; margin-top:8px; line-height:1.5; }
   #app .foot { margin-top:26px; text-align:center; color:var(--cinza); font-size:12.5px; }
-  #app a.reset { color:var(--cinza); font-size:12px; cursor:pointer; text-decoration:underline; background:none;border:none;font-family:inherit;}
+  /* botões discretos: reiniciar progresso, sair da oficina */
+  #app .reset {
+    font-family:inherit; font-size:12.5px; font-weight:600; line-height:1;
+    color:var(--cinza); background:#fff; border:1.5px solid var(--linha);
+    padding:7px 14px; border-radius:999px; cursor:pointer; vertical-align:middle;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  #app .reset:hover { color:#c0392b; border-color:#edbdb6; background:#fdf5f4; }
+  #app .reset:active { transform: translateY(1px); }
+  #app .reset:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -388,7 +397,7 @@ function App(){
                 ))}
               </ul>
               <div className="of-nota">
-                Atualiza a cada resposta certa e, com o painel aberto, também sozinho de 20 em 20 segundos. Estás como <b>{oficina.nome}</b>.
+                Atualização a cada 20s. Estás como <b>{oficina.nome}</b>.
                 <button className="reset" style={{marginLeft:8}} onClick={sairOficina}>sair da oficina</button>
               </div>
             </>
